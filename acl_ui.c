@@ -3,10 +3,10 @@
 #include "acllib/acl_lib.h"
 
 access_list_t *
-access_list_create (const char **,  int n_acl_entries) {
+access_list_create (const char **acl_entry_list,  int n_acl_entries) {
 
-
-    return NULL;
+    if (!n_acl_entries) return NULL;
+    return access_list_lib_create (acl_entry_list, n_acl_entries);
 }
 
 bool 
