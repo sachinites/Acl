@@ -5,9 +5,10 @@
 #include <stdint.h>
 
 typedef struct mtrie_ mtrie_t;
+typedef struct acl_entry_ acl_entry_t;
 
 /* Stores the info as read from CLI */
-typedef struct acl_entry_{
+struct acl_entry_{
 
     acl_action_t action;
     unsigned char *remark;
@@ -50,7 +51,8 @@ typedef struct acl_entry_{
     uint64_t hit_count;
     uint32_t tcam_total_count; /* No of TCAM entries installed in TCAM */
 
-} acl_entry_t;
+    acl_entry_t *prev, *next;
+} ;
 
 
 typedef struct access_list_ {
@@ -73,5 +75,8 @@ acl_compile (acl_entry_t *acl_entry);
 
 void 
 acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry);
+
+uint32_t 
+acl_entry_get_total_tcam_count (acl_entry_t *acl_ebtry );
 
 #endif 

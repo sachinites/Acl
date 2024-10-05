@@ -210,9 +210,97 @@ DST_ADDR:
 }
 
 
+uint32_t 
+acl_entry_get_total_tcam_count (acl_entry_t *acl_entry ) {
+
+    uint32_t tcam_count = 
+        acl_entry->tcam_sport_count * acl_entry->tcam_dport_count;
+
+    return tcam_count;
+}
 
 void 
 acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry) {
 
-    
+    acl_entry->tcam_total_count = 
+        acl_entry_get_total_tcam_count (acl_entry);
+
+    if (!acl_entry->tcam_total_count) return;
+
+    int src_port_it;
+    int dst_port_it; 
+    bitmap_t tcam_mask;
+    bitmap_t tcam_prefix;
+    int total_tcam_count = 0;
+
+    for (src_port_it = 0; src_port_it < acl_entry->tcam_sport_count; src_port_it++) {
+
+        for (dst_port_it = 0;  dst_port_it < acl_entry->tcam_dport_count; dst_port_it++) {
+
+            bitmap_init(&tcam_prefix, ACL_PREFIX_LEN);
+            bitmap_init(&tcam_mask, ACL_PREFIX_LEN);
+
+            uint16_t *prefix_ptr2 = (uint16_t *)&tcam_prefix.bits;
+            uint32_t *prefix_ptr4 = (uint32_t *)&tcam_prefix.bits;
+            uint16_t *mask_ptr2 = (uint16_t *)&tcam_mask.bits;
+            uint32_t *mask_ptr4 = (uint32_t *)&tcam_mask.bits;
+            uint16_t bytes_copied = 0;       
+
+            /* L4 Protocol */
+            memcpy(prefix_ptr2, &acl_entry->tcam_l4proto_prefix, sizeof(*prefix_ptr2));
+            memcpy(mask_ptr2, &acl_entry->tcam_l4proto_wcard, sizeof(*mask_ptr2));
+            prefix_ptr2++;
+            mask_ptr2++;
+            prefix_ptr4 = (uint32_t *)prefix_ptr2;
+            mask_ptr4 = (uint32_t *)mask_ptr2;
+            bytes_copied += sizeof(*prefix_ptr2);
+
+            /* L3 Protocol*/
+            memcpy(prefix_ptr2, &acl_entry->tcam_l3proto_prefix, sizeof(*prefix_ptr2));
+            memcpy(mask_ptr2, &acl_entry->tcam_l3proto_wcard, sizeof(*mask_ptr2));
+            prefix_ptr2++;
+            mask_ptr2++;
+            prefix_ptr4 = (uint32_t *)prefix_ptr2;
+            mask_ptr4 = (uint32_t *)mask_ptr2;
+            bytes_copied += sizeof(*prefix_ptr2);
+
+            /* Src ip Address & Mask */
+            memcpy(prefix_ptr4, &acl_entry->tcam_src_addr_prefix, sizeof(*prefix_ptr4));
+            memcpy(mask_ptr4, &acl_entry->tcam_src_subnet_mask_prefix, sizeof(*mask_ptr4));
+            prefix_ptr4++;
+            mask_ptr4++;
+            prefix_ptr2 = (uint16_t *)prefix_ptr4;
+            mask_ptr2 = (uint16_t *)mask_ptr4;
+            bytes_copied += sizeof(*prefix_ptr4);
+
+            /* Src Port */
+            memcpy(prefix_ptr2, &((*acl_entry->tcam_sport_prefix)[src_port_it]), sizeof(*prefix_ptr2));
+            memcpy(mask_ptr2, &((*acl_entry->tcam_sport_wcard)[src_port_it]), sizeof(*mask_ptr2));
+            prefix_ptr2++;
+            mask_ptr2++;
+            prefix_ptr4 = (uint32_t *)prefix_ptr2;
+            mask_ptr4 = (uint32_t *)mask_ptr2;
+            bytes_copied += sizeof(*prefix_ptr2);
+
+            /* Dst ip Address & Mask */
+            memcpy(prefix_ptr4, &acl_entry->tcam_dst_addr_prefix, sizeof(*prefix_ptr4));
+            memcpy(mask_ptr4, &acl_entry->tcam_dst_subnet_mask_prefix, sizeof(*mask_ptr4));
+            prefix_ptr4++;
+            mask_ptr4++;
+            prefix_ptr2 = (uint16_t *)prefix_ptr4;
+            mask_ptr2 = (uint16_t *)mask_ptr4;
+            bytes_copied += sizeof(*prefix_ptr4);
+
+            /* Dst Port */
+            memcpy(prefix_ptr2, &((*acl_entry->tcam_dport_prefix)[dst_port_it]), sizeof(*prefix_ptr2));
+            memcpy(mask_ptr2, &((*acl_entry->tcam_dport_wcard)[dst_port_it]), sizeof(*mask_ptr2));
+            prefix_ptr2++;
+            mask_ptr2++;
+            prefix_ptr4 = (uint32_t *)prefix_ptr2;
+            mask_ptr4 = (uint32_t *)mask_ptr2;
+            bytes_copied += sizeof(*prefix_ptr2);
+
+            
+        }
+    }
 }

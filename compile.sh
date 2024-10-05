@@ -11,6 +11,10 @@ rm -f *.a
 g++ -g -c acllib/acl_lib_util.c -o acllib/acl_lib_util.o 
 g++ -g -c acllib/acl_lib.c -o acllib/acl_lib.o
 g++ -g -c acllib/acl_parser.c -o acllib/acl_parser.o
+cd acllib
+lex Parser.l
+cd .. 
+g++ -g -c acllib/lex.yy.c -o acllib/lex.yy.o -fpermissive
 
 g++ -g -c BitOp/bitmap.c -o BitOp/bitmap.o
 
@@ -25,6 +29,7 @@ g++ -g -c rt_ui.c -o rt_ui.o
 ar rs libacl.a acllib/acl_lib_util.o \
                      acllib/acl_lib.o \
                      acllib/acl_parser.o \
+                     acllib/lex.yy.o \
                      BitOp/bitmap.o \
                      gluethread/glthread.o \
                      mtrie/mtrie.o \
