@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <stdint.h>
-#include <time.h>
+#include <string.h>
 #include <assert.h>
 #include <arpa/inet.h>
 
@@ -15,7 +15,7 @@ char *curr_ptr = lex_buffer;
 char *lex_curr_token;
 int lex_curr_token_len;
 
-stack_t undo_stack = {-1, {0, 0, 0}};
+stk_t undo_stack = {-1, {0, 0, 0}};
 
 void 
 lex_push(lex_data_t lex_data) {
@@ -91,9 +91,9 @@ unsigned char *
 parser_alloc_token_value_default (uint16_t token_id) {
 
     unsigned char *ptr = (unsigned char *)(calloc (1, yyleng + 1));
-    strncpy (ptr, yytext, yyleng);
+    strncpy ((char *)ptr, (const char *)yytext, yyleng);
     ptr [yyleng] = '\0';
-    return (void *)ptr;
+    return ptr;
 }
 
 int 

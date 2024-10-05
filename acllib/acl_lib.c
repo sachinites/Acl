@@ -42,7 +42,6 @@ access_list_lib_create (const char **acl_entry_list,  int n_acl_entries) {
 
         acl_compile (acl_entry_temp[i]);
         acl_entry_install (access_list, acl_entry_temp[i]);
-        acl_entry_free (acl_entry_temp[i]);
         acl_entry_temp[i] = NULL;
     }
 
@@ -219,6 +218,23 @@ acl_entry_get_total_tcam_count (acl_entry_t *acl_entry ) {
     return tcam_count;
 }
 
+static void
+access_list_mtrie_allocate_mnode_data (mtrie_node_t *mnode, acl_entry_t *new_acl_entry ) {
+
+    assert(!mnode->data);
+    assert(new_acl_entry);
+
+    if (mnode->data == NULL) {
+        mnode->data = (void *)new_acl_entry;
+        return;
+    }
+
+    acl_entry_t *old_head = (acl_entry_t *)mnode->data;
+    new_acl_entry->next = old_head;
+    old_head->prev = new_acl_entry;
+    mnode->data = (void *)new_acl_entry;
+}
+
 void 
 acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry) {
 
@@ -232,19 +248,18 @@ acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry) {
     bitmap_t tcam_mask;
     bitmap_t tcam_prefix;
     int total_tcam_count = 0;
+    bitmap_init(&tcam_prefix, ACL_PREFIX_LEN);
+    bitmap_init(&tcam_mask, ACL_PREFIX_LEN);
 
     for (src_port_it = 0; src_port_it < acl_entry->tcam_sport_count; src_port_it++) {
 
         for (dst_port_it = 0;  dst_port_it < acl_entry->tcam_dport_count; dst_port_it++) {
 
-            bitmap_init(&tcam_prefix, ACL_PREFIX_LEN);
-            bitmap_init(&tcam_mask, ACL_PREFIX_LEN);
-
             uint16_t *prefix_ptr2 = (uint16_t *)&tcam_prefix.bits;
             uint32_t *prefix_ptr4 = (uint32_t *)&tcam_prefix.bits;
             uint16_t *mask_ptr2 = (uint16_t *)&tcam_mask.bits;
             uint32_t *mask_ptr4 = (uint32_t *)&tcam_mask.bits;
-            uint16_t bytes_copied = 0;       
+            uint16_t bytes_copied = 0;
 
             /* L4 Protocol */
             memcpy(prefix_ptr2, &acl_entry->tcam_l4proto_prefix, sizeof(*prefix_ptr2));
@@ -300,7 +315,29 @@ acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry) {
             mask_ptr4 = (uint32_t *)mask_ptr2;
             bytes_copied += sizeof(*prefix_ptr2);
 
-            
+            total_tcam_count++;
+
+            mtrie_node_t *mnode = NULL;
+            mtrie_ops_result_code_t result = mtrie_insert_prefix(
+                access_list->mtrie,
+                &tcam_prefix,
+                &tcam_mask,
+                ACL_PREFIX_LEN,
+                &mnode);
+
+            switch (result)
+            {
+                case MTRIE_INSERT_SUCCESS:
+                case MTRIE_INSERT_DUPLICATE:
+                    access_list_mtrie_allocate_mnode_data(mnode, acl_entry);
+                    break;
+                case MTRIE_INSERT_FAILED:
+                    assert(0);
+            }
         }
     }
+
+    assert(total_tcam_count == acl_entry->tcam_total_count);
+    bitmap_free_internal(&tcam_prefix);
+    bitmap_free_internal(&tcam_mask);
 }

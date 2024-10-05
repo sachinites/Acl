@@ -27,14 +27,14 @@ typedef struct stack_ {
 
     int top;
     lex_data_t data[MAX_MEXPR_LEN];
-} stack_t;
+} stk_t;
 
 extern char lex_buffer[MAX_STRING_SIZE];
 extern char *curr_ptr ;
 extern char *lex_curr_token;
 extern int lex_curr_token_len;
 
-extern stack_t undo_stack;
+extern stk_t undo_stack;
 extern void lex_push(lex_data_t lex_data);
 extern lex_data_t lex_pop() ;
 extern void yyrewind (int n) ;
