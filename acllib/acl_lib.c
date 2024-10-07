@@ -2,9 +2,18 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <arpa/inet.h>
+#include <assert.h>
 #include "../mtrie/mtrie.h"
 #include "acl_lib.h"
 #include "acl_lib_util.h" 
+
+static void 
+access_list_mtrie_free_app_data (mtrie_node_t *mnode) {
+
+    if (!mnode->data) return;
+    acl_entry_free ( (acl_entry_t *)(mnode->data));
+    mnode->data = NULL;
+}
 
 access_list_t *
 access_list_lib_create (const char **acl_entry_list,  int n_acl_entries) {
@@ -36,7 +45,7 @@ access_list_lib_create (const char **acl_entry_list,  int n_acl_entries) {
 
     access_list_t *access_list = (access_list_t *)calloc(1, sizeof (access_list_t));
     access_list->mtrie = (mtrie_t *)calloc(1, sizeof (mtrie_t));
-    init_mtrie(access_list->mtrie, ACL_PREFIX_LEN, NULL);
+    init_mtrie(access_list->mtrie, ACL_PREFIX_LEN, access_list_mtrie_free_app_data );
 
     for (i = 0; i < n_acl_entries; i++) {
 
@@ -340,4 +349,104 @@ acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry) {
     assert(total_tcam_count == acl_entry->tcam_total_count);
     bitmap_free_internal(&tcam_prefix);
     bitmap_free_internal(&tcam_mask);
+}
+
+void 
+access_list_lib_destroy (access_list_t *access_list) {
+
+    mtrie_destroy (access_list->mtrie);
+    free (access_list->mtrie);
+    free (access_list);
+}
+
+bool 
+access_list_lib_evaluate1 (access_list_t *access_list, char *ip_hdr) {
+
+    uint32_t src_addr = *(uint32_t *) (ip_hdr + 12 );
+    uint32_t dst_addr = *(uint32_t *) (ip_hdr + 16 );
+    uint16_t protocol = *(uint16_t *) (ip_hdr + 9);
+    uint8_t ip_hdr_len = *(uint8_t *) (ip_hdr + 1 );
+    char *transport_hdr = ip_hdr + ip_hdr_len;
+    switch (protocol) {
+        case ACL_TCP:
+        case ACL_UDP:
+            {
+                uint16_t src_port = *(uint16_t *)(transport_hdr);
+                uint16_t dst_port = *(uint16_t *)(transport_hdr + 2);
+                return access_list_lib_evaluate2 (access_list,
+                                ACL_IP, 
+                                protocol, 
+                                src_addr, dst_addr, src_port, dst_port);
+            }
+            break;
+            default:
+                assert(0); // Non IPV4 packets not supported
+    }
+    return false;
+}
+
+static void
+bitmap_fill_with_params(
+        bitmap_t *bitmap,
+        uint16_t l3proto,
+        uint16_t l4proto,
+        uint32_t src_addr,
+        uint32_t dst_addr,
+        uint16_t src_port,
+        uint16_t dst_port) {
+
+        uint16_t *ptr2 = (uint16_t *)(bitmap->bits);
+
+        /* Transport Protocol 2 B*/
+        *ptr2 = htons(l4proto);
+        ptr2++;
+
+        /* Network Layer Protocol 2 B*/
+        *ptr2 = htons(l3proto);
+        ptr2++;
+
+        uint32_t *ptr4 = (uint32_t *)ptr2;
+        *ptr4 = htonl(src_addr);
+        ptr4++;
+
+        ptr2 = (uint16_t *)ptr4;
+        *ptr2 = htons(src_port);
+        ptr2++;
+
+        ptr4 = (uint32_t *)ptr2;
+
+        *ptr4 = htonl(dst_addr);
+        ptr4++;
+
+        ptr2 = (uint16_t *)ptr4;
+        *ptr2 = htons(dst_port);
+
+        /* 128 bit ACL entry size is supported today */
+}
+
+bool 
+access_list_lib_evaluate2 (access_list_t *access_list, 
+                                    uint16_t l3proto,
+                                    uint16_t l4roto,
+                                    uint32_t src_addr,
+                                    uint32_t dst_addr,
+                                    uint16_t src_port,
+                                    uint16_t dst_port) {
+
+    bitmap_t input;
+    acl_entry_t *acl_entry;
+    mtrie_node_t *hit_mnode = NULL;
+
+    bitmap_init (&input, ACL_PREFIX_LEN);
+
+    bitmap_fill_with_params (&input, l3proto, l4roto, src_addr, dst_addr, src_port, dst_port);
+
+    hit_mnode = mtrie_longest_prefix_match_search  (access_list->mtrie, &input);
+    
+    if (!hit_mnode) return false;
+
+    acl_entry = (acl_entry_t *) (hit_mnode->data);
+    acl_entry->hit_count++;
+    bool rc =  (acl_entry->action == ACL_PERMIT) ? true : false;
+    return rc;
 }

@@ -10,9 +10,9 @@ access_list_create (const char **acl_entry_list,  int n_acl_entries) {
 }
 
 bool 
-access_list_evaluate1 (access_list_t *access_list, char *ip_hdr, char *transport_hdr) {
+access_list_evaluate1 (access_list_t *access_list, char *ip_hdr) {
 
-    return false;
+    return access_list_lib_evaluate1(access_list, ip_hdr);
 }
 
 bool 
@@ -24,11 +24,17 @@ access_list_evaluate2 (access_list_t *access_list,
                                     uint16_t src_port,
                                     uint16_t dst_port) {
 
-    return false;
+    return access_list_lib_evaluate2 (access_list, 
+                                            l3proto,
+                                            l4roto,
+                                            src_addr,
+                                            dst_addr,
+                                            src_port,
+                                            dst_port); 
 }
 
 void 
 access_list_destroy (access_list_t *access_list) {
 
-
+    access_list_lib_destroy (access_list);
 }

@@ -12,7 +12,7 @@ access_list_t *
 access_list_create (const char **,  int n_acl_entries);
 
 bool 
-access_list_evaluate1 (access_list_t *access_list, char *ip_hdr, char *transport_hdr);
+access_list_evaluate1 (access_list_t *access_list, char *ip_hdr);
 
 bool 
 access_list_evaluate2 (access_list_t *access_list, 

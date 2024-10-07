@@ -7,7 +7,7 @@ rm -f mtrie/*.o
 rm -f stack/*.o
 rm -f *.a
 
-CFLAGS=-g -fpermissive -Wdeprecated
+CFLAGS=-g
 
 g++ ${CFLAGS} -c acllib/acl_lib_util.c -o acllib/acl_lib_util.o 
 g++ ${CFLAGS} -c acllib/acl_lib.c -o acllib/acl_lib.o

@@ -79,4 +79,19 @@ acl_entry_install (access_list_t *access_list, acl_entry_t *acl_entry);
 uint32_t 
 acl_entry_get_total_tcam_count (acl_entry_t *acl_ebtry );
 
+void 
+access_list_lib_destroy (access_list_t *access_list);
+
+bool 
+access_list_lib_evaluate1 (access_list_t *access_list, char *ip_hdr) ;
+
+bool 
+access_list_lib_evaluate2 (access_list_t *access_list, 
+                                    uint16_t l3proto,
+                                    uint16_t l4roto,
+                                    uint32_t src_addr,
+                                    uint32_t dst_addr,
+                                    uint16_t src_port,
+                                    uint16_t dst_port) ;
+
 #endif 
