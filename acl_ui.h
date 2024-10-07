@@ -26,4 +26,7 @@ access_list_evaluate2 (access_list_t *access_list,
 void 
 access_list_destroy (access_list_t *access_list);
 
+void 
+access_list_show (access_list_t *access_list);
+
 #endif 

@@ -15,8 +15,28 @@ typedef enum {
 
 } acl_proto_t;
 
+static char *
+acl_proto_str (acl_proto_t proto) {
+
+    switch (proto) {
+        case ACL_IP:
+            return "ip";
+        case ACL_ICMP:
+            return "icmp";
+        case ACL_TCP:
+            return "tcp";
+        case ACL_UDP:
+            return "udp";
+        case ACL_PROTO_ANY:
+            return "any";
+        default:
+            return "unknown";
+    }
+}
+
 #define ACL_PREFIX_LEN  128
 #define MAX_PFX_WC_ARRAY_LEN 64
+#define ACL_MAX_PORTNO 65535 
 
 #define APPLICATION_LAYER 5 
 #define TRANSPORT_LAYER 4

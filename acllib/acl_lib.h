@@ -50,14 +50,17 @@ struct acl_entry_{
 
     uint64_t hit_count;
     uint32_t tcam_total_count; /* No of TCAM entries installed in TCAM */
+    uint32_t ref_count;
 
-    acl_entry_t *prev, *next;
+    acl_entry_t *mtrie_prev, *mtrie_next;
+    acl_entry_t *acclst_prev, *acclst_next;
 } ;
 
 
 typedef struct access_list_ {
 
     mtrie_t *mtrie;
+    acl_entry_t *head;
 
 } access_list_t;
 
@@ -93,5 +96,16 @@ access_list_lib_evaluate2 (access_list_t *access_list,
                                     uint32_t dst_addr,
                                     uint16_t src_port,
                                     uint16_t dst_port) ;
+uint32_t 
+acl_entry_get_hit_count (acl_entry_t *acl_entry);
+
+void
+acl_print (acl_entry_t *acl_entry) ;
+
+void 
+acl_entry_reference (acl_entry_t *acl_entry) ;
+
+void 
+acl_entry_dereference (acl_entry_t *acl_entry) ;
 
 #endif 

@@ -528,6 +528,30 @@ mtrie_longest_prefix_first_traverse(mtrie_t *mtrie,
     _mtrie_longest_prefix_first_traverse(mtrie, mtrie->root, process_fn_ptr, app_data);
 }
 
+
+static void 
+_mtrie_app_data_traverse(
+					mtrie_node_t *mnode, 
+                    void (*process_fn_ptr)( void *app_data) ) {
+
+    if (!mnode) return;
+    _mtrie_app_data_traverse(mnode->child[ONE], process_fn_ptr);
+    _mtrie_app_data_traverse(mnode->child[ZERO], process_fn_ptr);
+    _mtrie_app_data_traverse(mnode->child[DONT_CARE], process_fn_ptr);
+    process_fn_ptr(mnode->data);
+}
+
+
+void
+mtrie_app_data_traverse(
+					mtrie_t *mtrie, 
+                    void (*process_fn_ptr)( void *app_data) ) {
+
+    if (!mtrie->root) return;
+    _mtrie_app_data_traverse(mtrie->root, process_fn_ptr);
+}
+
+
 void mtrie_destroy (mtrie_t *mtrie) {
 
     mtrie_longest_prefix_first_traverse(mtrie, mtrie_node_delete, NULL);

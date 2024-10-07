@@ -9,9 +9,21 @@
 
 static void 
 access_list_mtrie_free_app_data (mtrie_node_t *mnode) {
+   
+    acl_entry_t *temp;
+    acl_entry_t *acl_entry = (acl_entry_t *)mnode->data;
 
     if (!mnode->data) return;
-    acl_entry_free ( (acl_entry_t *)(mnode->data));
+
+    while (acl_entry) {
+
+        temp = acl_entry->mtrie_next;
+        acl_entry->mtrie_prev = NULL;
+        acl_entry->mtrie_next = NULL;
+        acl_entry_dereference(acl_entry);
+        acl_entry = temp;
+    }
+
     mnode->data = NULL;
 }
 
@@ -24,21 +36,24 @@ access_list_lib_create (const char **acl_entry_list,  int n_acl_entries) {
 
     if (!n_acl_entries) return NULL;
 
-    acl_entry_t **acl_entry_temp = (acl_entry_t **)calloc (n_acl_entries, sizeof (acl_entry_t *));
+    acl_entry_t **acl_entry_temp_array = (acl_entry_t **)calloc (n_acl_entries, sizeof (acl_entry_t *));
 
     for (i = 0; i < n_acl_entries; i++) {
 
         acl_entry_str = acl_entry_list[i];
 
-        if ((acl_entry_temp[i] = acl_entry_lib_rule_str_parse (acl_entry_str))) {
+        if ((acl_entry_temp_array[i] = acl_entry_lib_rule_str_parse (acl_entry_str))) {
 
-            printf ("Error : %s : Failed to Parse acl_entry \n   %s\n", __FUNCTION__, acl_entry_str);
+            acl_entry_reference(acl_entry_temp_array[i]);
+
+            printf ("Error : %s : Failed to Parse acl_entry \n   %s\n", 
+                __FUNCTION__, acl_entry_str);
             i--;
             while (i >= 0) {
-                acl_entry_free (acl_entry_temp[i]);
+                acl_entry_dereference (acl_entry_temp_array[i]);
                 i--;
             }
-            free (acl_entry_temp);
+            free (acl_entry_temp_array);
             return NULL;
         }
     }
@@ -49,31 +64,15 @@ access_list_lib_create (const char **acl_entry_list,  int n_acl_entries) {
 
     for (i = 0; i < n_acl_entries; i++) {
 
-        acl_compile (acl_entry_temp[i]);
-        acl_entry_install (access_list, acl_entry_temp[i]);
-        acl_entry_temp[i] = NULL;
+        acl_compile (acl_entry_temp_array[i]);
+        acl_entry_install (access_list, acl_entry_temp_array[i]);
+        acl_entry_dereference (acl_entry_temp_array[i]);
+        acl_entry_temp_array[i] = NULL;
     }
 
-    free (acl_entry_temp);
+    free (acl_entry_temp_array);
     return access_list;
 }
-
-void 
-acl_entry_free (acl_entry_t *acl_entry) {
-
-    if (acl_entry->tcam_sport_prefix) 
-        free (acl_entry->tcam_sport_prefix);
-    if (acl_entry->tcam_sport_wcard) 
-        free (acl_entry->tcam_sport_wcard);
-
-    if (acl_entry->tcam_dport_prefix) 
-        free (acl_entry->tcam_dport_prefix);
-    if (acl_entry->tcam_dport_wcard) 
-        free (acl_entry->tcam_dport_wcard);
-
-    free (acl_entry);
-}
-
 
 void
 acl_compile (acl_entry_t *acl_entry) {
@@ -239,9 +238,10 @@ access_list_mtrie_allocate_mnode_data (mtrie_node_t *mnode, acl_entry_t *new_acl
     }
 
     acl_entry_t *old_head = (acl_entry_t *)mnode->data;
-    new_acl_entry->next = old_head;
-    old_head->prev = new_acl_entry;
+    new_acl_entry->mtrie_next = old_head;
+    old_head->mtrie_prev = new_acl_entry;
     mnode->data = (void *)new_acl_entry;
+    acl_entry_reference (new_acl_entry);
 }
 
 void 
@@ -449,4 +449,97 @@ access_list_lib_evaluate2 (access_list_t *access_list,
     acl_entry->hit_count++;
     bool rc =  (acl_entry->action == ACL_PERMIT) ? true : false;
     return rc;
+}
+
+uint32_t 
+acl_entry_get_hit_count (acl_entry_t *acl_entry) {
+
+    return acl_entry->hit_count;
+}
+
+void
+acl_print (acl_entry_t *acl_entry) {
+
+    char ip_addr[16];
+
+    printf (" %s %s",
+        acl_entry->action == ACL_PERMIT ? "permit" : "deny" , 
+        acl_proto_str ( acl_entry->proto));
+
+    switch (acl_entry->proto)
+    {
+    case ACL_UDP:
+    case ACL_TCP:
+        if (acl_entry->sport.lb == 0 && acl_entry->sport.ub == 0)
+            break;
+        else if (acl_entry->sport.lb == 0 && acl_entry->sport.ub < ACL_MAX_PORTNO)
+            printf(" lt %d", acl_entry->sport.ub);
+        else if (acl_entry->sport.lb > 0 && acl_entry->sport.ub == ACL_MAX_PORTNO)
+            printf(" gt %d", acl_entry->sport.lb);
+        else if (acl_entry->sport.lb == acl_entry->sport.ub)
+            printf(" eq %d", acl_entry->sport.lb);
+        else
+            printf(" range %d %d", acl_entry->sport.lb, acl_entry->sport.ub);
+        break;
+    default:;
+    }
+
+    inet_ntop (AF_INET, &acl_entry->src_addr, ip_addr, 16);
+    printf (" %s", ip_addr);
+
+    inet_ntop (AF_INET, &acl_entry->dst_addr, ip_addr, 16);
+    printf (" %s", ip_addr);
+
+    switch (acl_entry->proto)
+    {
+    case ACL_UDP:
+    case ACL_TCP:
+        if (acl_entry->dport.lb == 0 && acl_entry->dport.ub == 0)
+            break;
+        else if (acl_entry->dport.lb == 0 && acl_entry->dport.ub < ACL_MAX_PORTNO)
+            printf(" lt %d", acl_entry->dport.ub);
+        else if (acl_entry->dport.lb > 0 && acl_entry->dport.ub == ACL_MAX_PORTNO)
+            printf(" gt %d", acl_entry->dport.lb);
+        else if (acl_entry->dport.lb == acl_entry->dport.ub)
+            printf(" eq %d", acl_entry->dport.lb);
+        else
+            printf(" range %d %d", acl_entry->dport.lb, acl_entry->dport.ub);
+        break;
+    default:;
+    }
+
+    printf ("    (Hits[%u] Tcam-Count[T:%u, R:%u])",
+                        acl_entry->hit_count,
+                        acl_entry->tcam_total_count,
+                        acl_entry->ref_count);
+}
+
+void 
+acl_entry_reference (acl_entry_t *acl_entry) { acl_entry->ref_count++; }
+
+static void 
+acl_entry_free (acl_entry_t *acl_entry) {
+
+    if (acl_entry->tcam_sport_prefix) 
+        free (acl_entry->tcam_sport_prefix);
+    if (acl_entry->tcam_sport_wcard) 
+        free (acl_entry->tcam_sport_wcard);
+
+    if (acl_entry->tcam_dport_prefix) 
+        free (acl_entry->tcam_dport_prefix);
+    if (acl_entry->tcam_dport_wcard) 
+        free (acl_entry->tcam_dport_wcard);
+
+    free (acl_entry);
+}
+
+void 
+acl_entry_dereference (acl_entry_t *acl_entry) {
+
+    assert (acl_entry->ref_count);
+    acl_entry->ref_count--;
+    if (acl_entry->ref_count) return;
+    assert (!acl_entry->acclst_next && !acl_entry->acclst_prev);
+    assert (!acl_entry->mtrie_next && !acl_entry->mtrie_prev);
+    acl_entry_free (acl_entry);
 }

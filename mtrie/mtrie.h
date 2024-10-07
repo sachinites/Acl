@@ -85,6 +85,11 @@ mtrie_longest_prefix_first_traverse(mtrie_t *mtrie,
                                                          void (*process_fn_ptr)(mtrie_t *, mtrie_node_t *, void *),
                                                          void *app_data) ;
 
+void
+mtrie_app_data_traverse(
+					mtrie_t *mtrie, 
+                    void (*process_fn_ptr)( void *app_data) );
+
 void mtrie_print_raw(mtrie_t *mtrie);
 glthread_t * mtrie_node_delete_while_traversal (mtrie_t *mtrie, mtrie_node_t *node);
 

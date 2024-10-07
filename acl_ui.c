@@ -38,3 +38,26 @@ access_list_destroy (access_list_t *access_list) {
 
     access_list_lib_destroy (access_list);
 }
+
+
+static void 
+acl_entry_show_stats (void *data) {
+
+    acl_entry_t *acl_entry = (acl_entry_t *)data;
+    while (acl_entry) {
+        acl_print (acl_entry);
+        acl_entry = acl_entry->mtrie_next;    
+    }
+}
+
+/* Importing the MTRIE lib function directly */
+extern void
+mtrie_app_data_traverse(
+					mtrie_t *mtrie, 
+                    void (*process_fn_ptr)( void *app_data) ) ;
+
+void 
+access_list_show (access_list_t *access_list) {
+
+    mtrie_app_data_traverse (access_list->mtrie, acl_entry_show_stats);
+}
